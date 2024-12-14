@@ -7,9 +7,12 @@ public class PlayerController : MonoBehaviour
     PlayerInput playerInput;
     InputAction moveAction;
     private Camera mainCamera;
+    [SerializeField] private Animator anim;
+    Rigidbody rb;
 
     // Public
-    public float moveSpeed;
+    public float moveSpeed = 5;
+    public float runSpeed = 10;
 
     private void Awake()
     {
@@ -19,6 +22,7 @@ public class PlayerController : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
+        rb = GetComponent<Rigidbody>();
         moveAction = playerInput.actions.FindAction("Move");
         mainCamera = Camera.main; // Get the main camera
     }
@@ -37,21 +41,47 @@ public class PlayerController : MonoBehaviour
         if (inputDirection != Vector2.zero)
         {
             // Get the camera's forward direction and project it to the ground plane
-            Vector3 cameraForward = mainCamera.transform.forward;
+            Vector3 cameraForward = -mainCamera.transform.forward;
             cameraForward.y = 0; // Ensure movement stays on the horizontal plane
             cameraForward.Normalize();
 
             // Get the camera's right direction
-            Vector3 cameraRight = mainCamera.transform.right;
-            cameraRight.y = 0;
-            cameraRight.Normalize();
+            Vector3 localRight = transform.right;
+            localRight.y = 0;
+            localRight.Normalize();
 
             // Calculate movement direction based on camera orientation
-            Vector3 moveDirection = (cameraForward * inputDirection.y + cameraRight * inputDirection.x) * -1; // Inverted direction
-            transform.position += moveDirection * moveSpeed * Time.deltaTime;
+            Vector3 moveDirection = (cameraForward * inputDirection.y + localRight * inputDirection.x) * -1; // Inverted direction
+            moveDirection.Normalize();
 
-            // Rotate the player to face the mouse
-            RotatePlayerToMouse();
+            float speed = Input.GetKey(KeyCode.LeftShift) ? runSpeed : moveSpeed;
+
+            // Apply movement with Rigidbody
+            rb.velocity = moveDirection * speed;
+
+            // Convert moveDirection to local space for animation
+            Vector3 localMoveDirection = transform.InverseTransformDirection(rb.velocity);
+
+            // Set the animation parameters
+            anim.SetFloat("xVelocity", localMoveDirection.x);
+            anim.SetFloat("zVelocity", localMoveDirection.z);
+
+            Debug.Log("xval: " + localMoveDirection.x + " zval: " + localMoveDirection.z);
+
+            // Rotate the player to face the mouse only when moving forward or backward
+            if (Mathf.Abs(inputDirection.y) > Mathf.Epsilon) // Check if moving forward/backward
+            {
+                RotatePlayerToMouse();
+            }
+        }
+        else
+        {
+            // Stop movement if no input
+            rb.velocity = Vector3.zero;
+
+            // Reset animation parameters
+            anim.SetFloat("xVelocity", 0);
+            anim.SetFloat("zVelocity", 0);
         }
     }
 
